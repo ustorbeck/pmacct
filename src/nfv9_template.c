@@ -23,6 +23,32 @@
 #include "pmacct.h"
 #include "nfv9_template.h"
 
+#define UWE_LOG_TEMPLATE(tpl_ptr) \
+{ \
+  char ip_addr[INET6_ADDRSTRLEN]; \
+  addr_to_str(ip_addr, &tpl_ptr->agent); \
+  UWE("( %s/core ): template agent %s, source %u, id %u (%u), type %u, fields %u", \
+      config.name, ip_addr, tpl_ptr->source_id, tpl_ptr->template_id, \
+      ntohs(tpl_ptr->template_id), tpl_ptr->template_type, tpl_ptr->num); \
+}
+#define UWE_LOG_TEMPLATE_FIELDS(tpl_ptr) \
+{ \
+  UWE_LOG_TEMPLATE(tpl_ptr) \
+  for (int i=0; i < tpl_ptr->num; ++i) { \
+    UWE("( %s/core ): template field %d, %s, offset %u, len %u, tpl len %u, repeat %u/%u", \
+        config.name, i, tpl_ptr->list[i].type ? "tpl_db" : "legacy", \
+        tpl_ptr->list[i].type ? ((struct utpl_field *)tpl_ptr->list[i].ptr)->off \
+        : ((struct otpl_field *)tpl_ptr->list[i].ptr)->off[tpl_ptr->list[i].repeat-1], \
+        tpl_ptr->list[i].type ? ((struct utpl_field *)tpl_ptr->list[i].ptr)->len \
+        : ((struct otpl_field *)tpl_ptr->list[i].ptr)->len[tpl_ptr->list[i].repeat-1], \
+        tpl_ptr->list[i].type ? ((struct utpl_field *)tpl_ptr->list[i].ptr)->tpl_len \
+        : ((struct otpl_field *)tpl_ptr->list[i].ptr)->tpl_len[tpl_ptr->list[i].repeat-1], \
+        tpl_ptr->list[i].repeat, \
+        tpl_ptr->list[i].type ? ((struct utpl_field *)tpl_ptr->list[i].ptr)->repeat_id \
+        : ((struct otpl_field *)tpl_ptr->list[i].ptr)->count); \
+  } \
+}
+
 /* structs */
 struct template_cache {
   struct template_cache_entry *c[TEMPLATE_CACHE_ENTRIES];
@@ -239,6 +265,8 @@ static void log_template_footer(struct template_cache_entry *tpl,
 static struct utpl_field *ext_db_get_next_ie(struct template_cache_entry *ptr,
                                              u_int16_t type, u_int8_t *repeat_id)
 {
+  UWE("( %s/core ): start", config.name);
+
   u_int16_t ie_idx, ext_db_modulo = (type % TPL_EXT_DB_ENTRIES);
   struct utpl_field *ext_db_ptr = NULL;
 
@@ -253,12 +281,21 @@ static struct utpl_field *ext_db_get_next_ie(struct template_cache_entry *ptr,
     }
   }
 
+  if (ext_db_ptr)
+    UWE("( %s/core ): found next template field pen %u, type %u, off %u, len %u, tpl len %u, repeat %u)",
+        config.name, ext_db_ptr->pen, ext_db_ptr->type, ext_db_ptr->off,
+        ext_db_ptr->len, ext_db_ptr->tpl_len, ext_db_ptr->repeat_id);
+  else
+    UWE("( %s/core ): no next template field found", config.name);
+
   return ext_db_ptr;
 }
 
 #ifdef WITH_JANSSON
 static void save_template(struct template_cache_entry *tpl, char *file)
 {
+  UWE("( %s/core ): start", config.name);
+
   FILE *tpl_file = open_output_file(config.nfacctd_templates_file, "a", TRUE);
   u_int16_t field_idx;
   char ip_addr[INET6_ADDRSTRLEN];
@@ -364,10 +401,14 @@ static void save_template(struct template_cache_entry *tpl, char *file)
   }
 
   close_output_file(tpl_file);
+
+  UWE("( %s/core ): end", config.name);
 }
 
 static void update_template_in_file(struct template_cache_entry *tpl, char *path)
 {
+  UWE("( %s/core ): start", config.name);
+
   FILE *tmp_file = fopen(path, "r");
   char tmpbuf[LARGEBUFLEN], tpl_agent_str[INET6_ADDRSTRLEN];
   const char *addr;
@@ -471,10 +512,14 @@ static void update_template_in_file(struct template_cache_entry *tpl, char *path
   }
 
   fclose(tmp_file);
+
+  UWE("( %s/core ): end", config.name);
 }
 
 static struct template_cache_entry *nfacctd_offline_read_json_template(char *buf, char *errbuf, int errlen)
 {
+  UWE("( %s/core ): start", config.name);
+
   struct template_cache_entry *ret = NULL;
 
   json_error_t json_err;
@@ -703,6 +748,7 @@ static struct template_cache_entry *nfacctd_offline_read_json_template(char *buf
 
             idx++;
           }
+          UWE_LOG_TEMPLATE_FIELDS(ret)
         }
       }
       /* Options template */
@@ -745,6 +791,7 @@ static struct template_cache_entry *nfacctd_offline_read_json_template(char *buf
 
             memcpy(&ret->fld[tpl_idx], &otpl, sizeof(struct otpl_field));
           }
+          UWE_LOG_TEMPLATE(ret)
         }
       }
     }
@@ -752,12 +799,16 @@ static struct template_cache_entry *nfacctd_offline_read_json_template(char *buf
     json_decref(json_obj);
   }
 
+  UWE("( %s/core ): end, template read successful", config.name);
+
   return ret;
 
   exit_lane:
   json_decref(json_obj);
   if (ret)
     free(ret);
+
+  UWE("( %s/core ): end, template read failed", config.name);
 
   return NULL;
 }
@@ -783,6 +834,10 @@ static layer_prot evaluate_layer_prot(u_int16_t type)
 
 static int get_ipfix_vlen(u_char *base, u_int16_t remlen, u_int16_t *len)
 {
+  UWE("( %s/core ): start, base %u, remlen %u, vlen %u",
+      config.name, *base, remlen, *len);
+  UWEX(base, remlen);
+
   u_char *ptr = base;
   u_int8_t *len8;
   u_int16_t *len16;
@@ -809,6 +864,8 @@ static int get_ipfix_vlen(u_char *base, u_int16_t remlen, u_int16_t *len)
     else ret = ERR;
   }
 
+  UWE("( %s/core ): end, vlen %u, return %d", config.name, *len, ret);
+
   return ret;
 }
 
@@ -816,6 +873,8 @@ static u_char *compose_template_key(pm_hash_serial_t *ser, u_int8_t nf_version,
 				    u_int16_t template_id, struct sockaddr *agent,
 				    u_int32_t source_id)
 {
+  UWE("( %s/core ): start", config.name);
+
   pm_hash_key_t *hash_key;
   u_int16_t hash_keylen;
   u_int16_t saved_agent_port;
@@ -838,6 +897,8 @@ static struct template_cache_entry *compose_template(struct template_hdr_v9 *hdr
                                                      u_int32_t sid, u_int16_t *pens, u_int8_t version,
                                                      u_int16_t len, u_int32_t seq)
 {
+  UWE("( %s/core ): start", config.name);
+
   struct template_cache_entry *tpl;
   struct template_field_v9 *field;
   u_int16_t num = ntohs(hdr->num), type, port, off, count;
@@ -990,6 +1051,9 @@ static struct template_cache_entry *compose_template(struct template_hdr_v9 *hdr
 
   log_template_footer(tpl, tpl->len, version);
 
+  UWE_LOG_TEMPLATE_FIELDS(tpl)
+  UWE("( %s/core ): end", config.name);
+
   return tpl;
 }
 
@@ -997,6 +1061,8 @@ static struct template_cache_entry *compose_opt_template(void *hdr, struct socka
                                                          u_int16_t tpl_type, u_int32_t sid, u_int16_t *pens,
                                                          u_int8_t version, u_int16_t len, u_int32_t seq)
 {
+  UWE("( %s/core ): start", config.name);
+
   struct options_template_hdr_v9 *hdr_v9 = (struct options_template_hdr_v9 *) hdr;
   struct options_template_hdr_ipfix *hdr_v10 = (struct options_template_hdr_ipfix *) hdr;
   struct template_cache_entry *tpl;
@@ -1127,6 +1193,9 @@ static struct template_cache_entry *compose_opt_template(void *hdr, struct socka
 
   log_template_footer(tpl, tpl->len, version);
 
+  UWE_LOG_TEMPLATE(tpl)
+  UWE("( %s/core ): end", config.name);
+
   return tpl;
 }
 
@@ -1136,6 +1205,8 @@ static struct template_cache_entry *compose_opt_template(void *hdr, struct socka
 
 int init_template_cache_v2(void)
 {
+  UWE("( %s/core ): start", config.name);
+
   u_int16_t tpl_hash_keylen = calc_template_keylen();
   char pm_cdada_map_container[tpl_hash_keylen];
 
@@ -1144,6 +1215,7 @@ int init_template_cache_v2(void)
     Log(LOG_ERR, "ERROR ( %s/%s ): Unable to allocate tpl_data_map. Exiting.\n", config.name, config.type);
     return ERR;
   }
+  UWE("( %s/core ): end (success)", config.name);
 
   return SUCCESS;
 }
@@ -1152,6 +1224,9 @@ struct template_cache_entry *handle_template_v2(struct template_hdr_v9 *hdr, str
                                                 u_int16_t tpl_type, u_int32_t sid, u_int16_t *pens,
                                                 u_int16_t len, u_int32_t seq)
 {
+  UWE("( %s/core ): start, template id %u (%u), type %u, source %u",
+      config.name, hdr->template_id, ntohs(hdr->template_id), tpl_type, sid);
+
   struct template_cache_entry *tpl = NULL, *old_tpl = NULL;
   u_int8_t version = 0;
   int ret;
@@ -1222,6 +1297,9 @@ struct template_cache_entry *handle_template_v2(struct template_hdr_v9 *hdr, str
   /* freeing hash key */
   hash_destroy_serial(&hash_serializer);
 
+  UWE("( %s/core ): end, return template id %u (%u), type %u, version %u",
+      config.name, tpl->template_id, ntohs(tpl->template_id), tpl->template_type, version);
+
   return tpl;
 }
 
@@ -1229,6 +1307,9 @@ struct template_cache_entry *find_template_v2(u_int16_t id, struct sockaddr *age
                                            u_int8_t version, u_int16_t tpl_type,
 					   u_int32_t sid)
 {
+  UWE("( %s/core ): start, template id %u (%u), type %u",
+      config.name, id, ntohs(id), tpl_type);
+
   struct template_cache_entry *tpl = NULL;
   pm_hash_serial_t hash_serializer;
   u_char *hash_keyval;
@@ -1252,11 +1333,31 @@ struct template_cache_entry *find_template_v2(u_int16_t id, struct sockaddr *age
   /* freeing hash key */
   hash_destroy_serial(&hash_serializer);
 
+  UWE("( %s/core ): end, template %sfound (cdada code %d)",
+      config.name, ret == CDADA_SUCCESS ? "" : "not ", ret);
+  if (ret == CDADA_SUCCESS && tpl) {
+    if (tpl->template_type == 0 || tpl->template_type == 2)
+      UWE_LOG_TEMPLATE_FIELDS(tpl)
+    else
+      UWE_LOG_TEMPLATE(tpl)
+  }
+
   return tpl;
 }
 
 int resolve_vlen_template(u_char *ptr, u_int16_t remlen, struct template_cache_entry *tpl)
 {
+  {
+    char ip_addr[INET6_ADDRSTRLEN];
+    addr_to_str(ip_addr, &tpl->agent);
+    UWE("( %s/core ): start, src addr %s, src id %u, tpl id %u (%u), type %u (%s), fields %u, flowset len %u, vlen fields %u, remlen %u",
+        config.name, ip_addr, tpl->source_id, tpl->template_id,
+        ntohs(tpl->template_id), tpl->template_type,
+        tpl->template_type ? "options" : "data",
+        tpl->num, tpl->len, tpl->vlen, remlen);
+    UWEX(ptr, remlen);
+  }
+
   struct otpl_field *otpl_ptr;
   struct utpl_field *utpl_ptr;
   u_int16_t idx = 0, len = 0;
@@ -1268,6 +1369,10 @@ int resolve_vlen_template(u_char *ptr, u_int16_t remlen, struct template_cache_e
 
     if (tpl->list[idx].type == TPL_TYPE_LEGACY) {
       otpl_ptr = (struct otpl_field *) tpl->list[idx].ptr;
+      UWE("( %s/core ): field %u, type legacy, repeat %u, ofs %u, fld len %u, len %u, vlen %u",
+          config.name, idx, tpl->list[idx].repeat, len,
+          otpl_ptr->tpl_len[tpl->list[idx].repeat-1],
+          otpl_ptr->len[tpl->list[idx].repeat-1], vlen);
       if (vlen)
         otpl_ptr->off[tpl->list[idx].repeat-1] = len;
       if (otpl_ptr->tpl_len[tpl->list[idx].repeat-1] == IPFIX_VARIABLE_LENGTH) {
@@ -1276,8 +1381,11 @@ int resolve_vlen_template(u_char *ptr, u_int16_t remlen, struct template_cache_e
                              &otpl_ptr->len[tpl->list[idx].repeat-1]);
         if (ret > 0)
           add_len = ret;
-        else
+        else {
+          UWE("( %s/core ): resolve vlen template failed (type legacy)",
+              config.name);
           return ERR;
+      }
 
         otpl_ptr->off[tpl->list[idx].repeat-1] = len + add_len;
       }
@@ -1285,6 +1393,9 @@ int resolve_vlen_template(u_char *ptr, u_int16_t remlen, struct template_cache_e
     }
     else if (tpl->list[idx].type == TPL_TYPE_EXT_DB) {
       utpl_ptr = (struct utpl_field *) tpl->list[idx].ptr;
+      UWE("( %s/core ): field %u, type ext_db, repeat %u, ofs %u, fld len %u, len %u, vlen %u",
+          config.name, idx, tpl->list[idx].repeat, len,
+          utpl_ptr->tpl_len, utpl_ptr->len, vlen);
       if (vlen)
         utpl_ptr->off = len;
       if (utpl_ptr->tpl_len == IPFIX_VARIABLE_LENGTH) {
@@ -1292,8 +1403,11 @@ int resolve_vlen_template(u_char *ptr, u_int16_t remlen, struct template_cache_e
         ret = get_ipfix_vlen(ptr+len, remlen - len, &utpl_ptr->len);
         if (ret > 0)
           add_len = ret;
-        else
+        else {
+          UWE("( %s/core ): resolve vlen template failed (type ext_db)",
+              config.name);
           return ERR;
+      }
 
         utpl_ptr->off = (len + add_len);
       }
@@ -1301,13 +1415,19 @@ int resolve_vlen_template(u_char *ptr, u_int16_t remlen, struct template_cache_e
     }
 
     /* if len is invalid (ie. greater than flowsetlen), we stop here */
-    if (len > remlen)
+    if (len > remlen) {
+      UWE("( %s/core ): resolve vlen template failed, template len %u, remaining len %u",
+          config.name, len, remlen);
       return ERR;
+    }
 
     idx++;
   }
 
   tpl->len = len;
+
+  UWE("( %s/core ): end, template length %u, remaining length %u",
+      config.name, len, remlen);
 
   return SUCCESS;
 }
@@ -1315,6 +1435,8 @@ int resolve_vlen_template(u_char *ptr, u_int16_t remlen, struct template_cache_e
 #ifdef WITH_JANSSON
 void load_templates_from_file(char *path)
 {
+  UWE("( %s/core ): start", config.name);
+
   struct template_cache_entry *tpl;
   FILE *tmp_file = fopen(path, "r");
   char errbuf[SRVBUFLEN], tmpbuf[LARGEBUFLEN];
@@ -1369,6 +1491,8 @@ void load_templates_from_file(char *path)
   }
 
   fclose(tmp_file);
+
+  UWE("( %s/core ): end", config.name);
 }
 #else
 void load_templates_from_file(char *path)
@@ -1389,10 +1513,18 @@ u_int16_t calc_template_keylen(void)
 struct utpl_field *ext_db_get_ie(struct template_cache_entry *ptr, u_int32_t pen,
                                  u_int16_t type, u_int8_t repeat_id)
 {
+  UWE("( %s/core ): start (pen %u, type %u, repeat %u)",
+      config.name, pen, type, repeat_id);
+
   u_int16_t ie_idx, ext_db_modulo = (type % TPL_EXT_DB_ENTRIES);
   struct utpl_field *ext_db_ptr = NULL;
 
   for (ie_idx = 0; ie_idx < IES_PER_TPL_EXT_DB_ENTRY; ie_idx++) {
+    UWE("( %s/core ): compare with db entry %u (pen %u, type %u, repeat %u)",
+        config.name, ie_idx,
+        ptr->ext_db[ext_db_modulo].ie[ie_idx].pen,
+        ptr->ext_db[ext_db_modulo].ie[ie_idx].type,
+        ptr->ext_db[ext_db_modulo].ie[ie_idx].repeat_id);
     if (ptr->ext_db[ext_db_modulo].ie[ie_idx].type == type &&
         ptr->ext_db[ext_db_modulo].ie[ie_idx].pen == pen &&
         ptr->ext_db[ext_db_modulo].ie[ie_idx].repeat_id == repeat_id) {
@@ -1400,6 +1532,13 @@ struct utpl_field *ext_db_get_ie(struct template_cache_entry *ptr, u_int32_t pen
       break;
     }
   }
+
+  if (ext_db_ptr)
+    UWE("( %s/core ): found template field pen %u, type %u, off %u, len %u, tpl len %u, repeat %u",
+        config.name, ext_db_ptr->pen, ext_db_ptr->type, ext_db_ptr->off,
+        ext_db_ptr->len, ext_db_ptr->tpl_len, ext_db_ptr->repeat_id);
+  else
+    UWE("( %s/core ): no template field found", config.name);
 
   return ext_db_ptr;
 }
