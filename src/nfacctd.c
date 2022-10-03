@@ -1009,6 +1009,19 @@ int main(int argc,char **argv, char **envp)
   if (config.aggregate_primitives) {
     req.key_value_table = (void *) &custom_primitives_registry;
     load_id_file(MAP_CUSTOM_PRIMITIVES, config.aggregate_primitives, NULL, &req, &custom_primitives_allocated);
+
+    if (custom_primitives_allocated) {
+      UWE("( %s/core ): %d custom primitives",
+          config.name, custom_primitives_registry.num);
+      struct custom_primitive_entry p;
+      for (int i=0; i < custom_primitives_registry.num; ++i) {
+        p = custom_primitives_registry.primitive[i];
+        UWE("( %s/core ): custom primitive %s"
+            " (pen %d, type %d, len %d, alloc %d, semantic %d, repeat %d)",
+            config.name, p.name, p.pen, p.field_type, p.len, p.alloc_len,
+            p.semantics, p.repeat_id);
+      }
+    }
   }
   else memset(&custom_primitives_registry, 0, sizeof(custom_primitives_registry));
 
@@ -1446,6 +1459,7 @@ int main(int argc,char **argv, char **envp)
 
   /* Main loop */
   for (;;) {
+    UWE("( %s/core ): start main loop", config.name);
     sigprocmask(SIG_BLOCK, &signal_set, NULL);
 
     if (config.pcap_savefile) {
@@ -1689,6 +1703,8 @@ int main(int argc,char **argv, char **envp)
 void process_v5_packet(unsigned char *pkt, u_int16_t len, struct packet_ptrs *pptrs,
 		struct plugin_requests *req, u_int16_t version, struct NF_dissect *tee_dissect)
 {
+  UWE("( %s/core ): start", config.name);
+
   struct struct_header_v5 *hdr_v5 = (struct struct_header_v5 *)pkt;
   struct struct_export_v5 *exp_v5;
   unsigned short int count = ntohs(hdr_v5->count);
@@ -1783,12 +1799,16 @@ void process_v5_packet(unsigned char *pkt, u_int16_t len, struct packet_ptrs *pp
     xflow_status_table.tot_bad_datagrams++;
     return;
   }
+
+  UWE("( %s/core ): end", config.name);
 } 
 
 void process_v9_packet(unsigned char *pkt, u_int16_t len, struct packet_ptrs_vector *pptrsv,
 		struct plugin_requests *req, u_int16_t version, struct NF_dissect *tee_dissect,
 		int *has_templates)
 {
+  UWE("( %s/core ): start (version %d)", config.name, version);
+
   struct struct_header_v9 *hdr_v9 = (struct struct_header_v9 *)pkt;
   struct struct_header_ipfix *hdr_v10 = (struct struct_header_ipfix *)pkt;
   struct template_hdr_v9 *template_hdr = NULL;
@@ -1892,6 +1912,9 @@ void process_v9_packet(unsigned char *pkt, u_int16_t len, struct packet_ptrs_vec
   }
 
   if (fid == 0 || fid == 2) { /* template: 0 NetFlow v9, 2 IPFIX */ 
+    UWE("( %s/core ): got data template, fid %u (%s)", config.name,
+        fid, fid == 0 ? "NetFlow" : fid == 2 ? "IPFIX" : "unknown");
+
     unsigned char *tpl_ptr = pkt;
     u_int16_t pens = 0;
 
@@ -1941,6 +1964,9 @@ void process_v9_packet(unsigned char *pkt, u_int16_t len, struct packet_ptrs_vec
     off += flowsetlen; 
   }
   else if (fid == 1 || fid == 3) { /* options template: 1 NetFlow v9, 3 IPFIX */
+    UWE("( %s/core ): got options template, fid %u (%s)", config.name,
+        fid, fid == 1 ? "NetFlow" : fid == 3 ? "IPFIX" : "unknown");
+
     unsigned char *tpl_ptr = pkt;
     u_int16_t pens = 0;
 
@@ -1982,11 +2008,13 @@ void process_v9_packet(unsigned char *pkt, u_int16_t len, struct packet_ptrs_vec
       if (!tpl) return;
 
       if (fid == 3 /* IPFIX */) {
+        UWE("( %s/core ): got ipfix packet (fid 3)", config.name);
 	tpl_len = sizeof(struct options_template_hdr_v9) +
 		  (((ntohs(opt_template_hdr->scope_len) + ntohs(opt_template_hdr->option_len)) * sizeof(struct template_field_v9)) +
 		  (pens * sizeof(u_int32_t)));
       }
       else if (fid == 1 /* NetFlow v9 */) {
+        UWE("( %s/core ): got netflow v9 packet (fid 1)", config.name);
 	tpl_len = sizeof(struct options_template_hdr_v9) +
 		  ((ntohs(opt_template_hdr->scope_len) + ntohs(opt_template_hdr->option_len)) +
 		  (pens * sizeof(u_int32_t)));
@@ -2000,6 +2028,9 @@ void process_v9_packet(unsigned char *pkt, u_int16_t len, struct packet_ptrs_vec
     off += flowsetlen;
   }
   else if (fid >= 256) { /* data */
+    UWE("( %s/core ): got data packet (fid %d), flowsetlen %u, ofs %u",
+        config.name, fid, flowsetlen, off);
+
     if (off+flowsetlen > len) { 
       notify_malf_packet(LOG_INFO, "INFO", "unable to read next Data Flowset (incomplete NetFlow v9/IPFIX packet)",
 		      (struct sockaddr *) pptrsv->v4.f_agent, FlowSeq);
@@ -2026,6 +2057,9 @@ void process_v9_packet(unsigned char *pkt, u_int16_t len, struct packet_ptrs_vec
       struct xflow_status_entry_sampling *sentry, *ssaved;
       struct xflow_status_entry_class *centry, *csaved;
 
+      UWE("( %s/core ): got options packet (template type 1, fid %u)",
+          config.name, fid);
+
       /* broadcast the whole flowset over */
       if (tee_dissect) {
         tee_dissect->elemBasePtr = NULL;
@@ -2041,6 +2075,8 @@ void process_v9_packet(unsigned char *pkt, u_int16_t len, struct packet_ptrs_vec
       }
 
       while (flowoff+tpl->len <= flowsetlen) {
+        UWE("( %s/core ): options packet loop, flow ofs %u, tpl len %u, flowset len %u",
+            config.name, flowoff, tpl->len, flowsetlen);
 	entry = (struct xflow_status_entry *) pptrs->f_status;
 	sentry = NULL, ssaved = NULL;
 	centry = NULL, csaved = NULL;
@@ -2320,12 +2356,22 @@ void process_v9_packet(unsigned char *pkt, u_int16_t len, struct packet_ptrs_vec
       off += flowsetlen;
     }
     else {
+      UWE("( %s/core ): got data packet? (template type %d), flowsetlen %u, flowoff %u, tpl len %u, tpl vlen %u",
+          config.name, tpl->template_type, flowsetlen, flowoff, tpl->len, tpl->vlen);
+
       while (flowoff+tpl->len <= flowsetlen) {
+
+        UWE("( %s/core ): top of data flow loop, flowoff %u, vlen %u, tpl len %u, flow seq %u",
+            config.name, flowoff, tpl->vlen, tpl->len, FlowSeqInc);
+
         /* Let's bake offsets and lengths if we have variable-length fields */
         if (tpl->vlen) {
 	  int ret;
 
 	  ret = resolve_vlen_template(pkt, (flowsetlen - flowoff), tpl);
+
+          UWE("( %s/core ): resolve_vlen_template return %d", config.name, ret);
+
 	  if (ret == ERR) break;
 	}
 
@@ -3122,6 +3168,10 @@ void process_v9_packet(unsigned char *pkt, u_int16_t len, struct packet_ptrs_vec
         }
 
         finalize_record:
+
+        UWE("( %s/core ): bottom of data flow loop, flowoff %u, vlen %u, tpl len %u, flow seq %u",
+            config.name, flowoff, tpl->vlen, tpl->len, FlowSeqInc);
+
         pkt += tpl->len;
         flowoff += tpl->len;
 	
@@ -3129,6 +3179,7 @@ void process_v9_packet(unsigned char *pkt, u_int16_t len, struct packet_ptrs_vec
 	   the case of the last record in a flowset; we can save a
 	   round through resolve_vlen_template() */
 	if (tpl->vlen) tpl->len = 1;
+
 	FlowSeqInc++;
       }
 
@@ -3165,11 +3216,15 @@ void process_v9_packet(unsigned char *pkt, u_int16_t len, struct packet_ptrs_vec
 
     if (entry) entry->inc = FlowSeqInc;
   }
+
+  UWE("( %s/core ): end", config.name);
 }
 
 void process_raw_packet(unsigned char *pkt, u_int16_t len, struct packet_ptrs_vector *pptrsv,
                 struct plugin_requests *req)
 {
+  UWE("( %s/core ): start", config.name);
+
   struct packet_ptrs *pptrs = &pptrsv->v4;
   u_int16_t nfv;
 
@@ -3256,6 +3311,8 @@ void process_raw_packet(unsigned char *pkt, u_int16_t len, struct packet_ptrs_ve
   req->ptm_c.exec_ptm_res = FALSE;
 
   exec_plugins(pptrs, req);
+
+  UWE("( %s/core ): end", config.name);
 }
 
 void NF_compute_once()
@@ -3296,8 +3353,40 @@ void NF_compute_once()
   IP6TlSz = sizeof(struct ip6_hdr)+sizeof(struct pm_tlhdr);
 }
 
+static char *UWE_get_flow_type(unsigned int flow_type)
+{
+  char *p;
+
+  switch(flow_type) {
+    case PM_FTYPE_TRAFFIC:        p = "PM_FTYPE_TRAFFIC";        break;
+    case PM_FTYPE_IPV4:           p = "PM_FTYPE_IPV4";           break;
+    case PM_FTYPE_IPV6:           p = "PM_FTYPE_IPV6";           break;
+    case PM_FTYPE_VLAN:           p = "PM_FTYPE_VLAN";           break;
+    case PM_FTYPE_VLAN_IPV4:      p = "PM_FTYPE_VLAN_IPV4";      break;
+    case PM_FTYPE_VLAN_IPV6:      p = "PM_FTYPE_VLAN_IPV6";      break;
+    case PM_FTYPE_MPLS:           p = "PM_FTYPE_MPLS";           break;
+    case PM_FTYPE_MPLS_IPV4:      p = "PM_FTYPE_MPLS_IPV4";      break;
+    case PM_FTYPE_MPLS_IPV6:      p = "PM_FTYPE_MPLS_IPV6";      break;
+    case PM_FTYPE_VLAN_MPLS:      p = "PM_FTYPE_VLAN_MPLS";      break;
+    case PM_FTYPE_VLAN_MPLS_IPV4: p = "PM_FTYPE_VLAN_MPLS_IPV4"; break;
+    case PM_FTYPE_VLAN_MPLS_IPV6: p = "PM_FTYPE_VLAN_MPLS_IPV6"; break;
+    case PM_FTYPE_SRV6:           p = "PM_FTYPE_SRV6";           break;
+    case PM_FTYPE_SRV6_IPV4:      p = "PM_FTYPE_SRV6_IPV4";      break;
+    case PM_FTYPE_SRV6_IPV6:      p = "PM_FTYPE_SRV6_IPV6";      break;
+    case PM_FTYPE_TRAFFIC_MAX:    p = "PM_FTYPE_TRAFFIC_MAX";    break;
+    case NF9_FTYPE_DLFS:          p = "NF9_FTYPE_DLFS";          break;
+    case NF9_FTYPE_EVENT:         p = "NF9_FTYPE_EVENT";         break;
+    //case NF9_FTYPE_NAT_EVENT:     p = "NF9_FTYPE_NAT_EVENT";     break;
+    case NF9_FTYPE_OPTION:        p = "NF9_FTYPE_OPTION";        break;
+    default:                      p = "unknown";                 break;
+  }
+  return p;
+}
+
 void NF_evaluate_flow_type(struct flow_chars *flow_type, struct template_cache_entry *tpl, struct packet_ptrs *pptrs)
 {
+  UWE("( %s/core ): start", config.name);
+
   u_int8_t ret = FALSE;
   u_int8_t have_ip_proto = FALSE;
 
@@ -3308,25 +3397,30 @@ void NF_evaluate_flow_type(struct flow_chars *flow_type, struct template_cache_e
       !tpl->fld[NF9_INITIATOR_OCTETS].count && !tpl->fld[NF9_RESPONDER_OCTETS].count && /* packets? && */
       !tpl->fld[NF9_DATALINK_FRAME_SECTION].count && !tpl->fld[NF9_LAYER2_PKT_SECTION_DATA].count &&
       !tpl->fld[NF9_LAYER2OCTETDELTACOUNT].count) {
+    UWE("( %s/core ): flow type NF9_FTYPE_EVENT", config.name);
     ret = NF9_FTYPE_EVENT;
   }
   else {
     if ((tpl->fld[NF9_IN_VLAN].count && *(pptrs->f_data+tpl->fld[NF9_IN_VLAN].off[0]) > 0) ||
         (tpl->fld[NF9_OUT_VLAN].count && *(pptrs->f_data+tpl->fld[NF9_OUT_VLAN].off[0]) > 0)) {
+      UWE("( %s/core ): flow type PM_FTYPE_VLAN", config.name);
       ret += PM_FTYPE_VLAN;
     }
 
     if (tpl->fld[NF9_MPLS_LABEL_1].count /* check: value > 0 ? */) {
+      UWE("( %s/core ): flow type PM_FTYPE_MPLS", config.name);
       ret += PM_FTYPE_MPLS;
     }
 
     /* Explicit IP protocol definition first; a bit of heuristics as fallback */
     if (tpl->fld[NF9_IP_PROTOCOL_VERSION].count) {
       if (*(pptrs->f_data+tpl->fld[NF9_IP_PROTOCOL_VERSION].off[0]) == 4) {
+        UWE("( %s/core ): flow type PM_FTYPE_IPV4", config.name);
 	ret += PM_FTYPE_IPV4;
 	have_ip_proto = TRUE;
       }
       else if (*(pptrs->f_data+tpl->fld[NF9_IP_PROTOCOL_VERSION].off[0]) == 6) {
+        UWE("( %s/core ): flow type PM_FTYPE_IPV6", config.name);
 	ret += PM_FTYPE_IPV6;
 	have_ip_proto = TRUE;
       }
@@ -3337,15 +3431,18 @@ void NF_evaluate_flow_type(struct flow_chars *flow_type, struct template_cache_e
         tpl->fld[NF9_L4_PROTOCOL].count) {
       u_int8_t tun_prot;
       memcpy(&tun_prot, pptrs->f_data+tpl->fld[NF9_L4_PROTOCOL].off[0], 1);
+      UWE("( %s/core ): l4 protocol %d", config.name, tun_prot);
       if (tpl->layers.count > 1) {
         if (tun_prot == 4 || tun_prot == 41) {
           if (tpl->layers.prot[1] == ipv4) {
             /* IPv4 in IPv6 encapsulation */
+            UWE("( %s/core ): flow type PM_FTYPE_SRV6_IPV4", config.name);
             ret = PM_FTYPE_SRV6_IPV4;
             have_ip_proto = TRUE;
           }
           else if (tpl->layers.prot[1] == ipv6) {
             /* IPv6 in IPv6 encapsulation */
+            UWE("( %s/core ): flow type PM_FTYPE_SRV6_IPV6", config.name);
             ret = PM_FTYPE_SRV6_IPV6;
             have_ip_proto = TRUE;
           }
@@ -3353,6 +3450,7 @@ void NF_evaluate_flow_type(struct flow_chars *flow_type, struct template_cache_e
       }
       else if (tun_prot == 143) {
         /* Ethernet in IPv6 encapsulation */
+        UWE("( %s/core ): flow type PM_FTYPE_SRV6", config.name);
         ret = PM_FTYPE_SRV6;
         have_ip_proto = TRUE;
       }
@@ -3365,19 +3463,25 @@ void NF_evaluate_flow_type(struct flow_chars *flow_type, struct template_cache_e
           (tpl->fld[NF9_IPV6_SRC_ADDR].count || tpl->fld[NF9_IPV6_DST_ADDR].count)) {
         if (tpl->layers.count > 0 && tpl->layers.prot[0] == ipv4 &&
             *(pptrs->f_data+tpl->fld[NF9_IPV4_SRC_ADDR].off[0]) != 0) {
+          UWE("( %s/core ): flow type PM_FTYPE_IPV4 (dual v4/v6, base prot)",
+              config.name);
           ret += PM_FTYPE_IPV4;
           have_ip_proto = TRUE;
         }
         else if (tpl->layers.count > 0 && tpl->layers.prot[0] == ipv6 &&
                  *(pptrs->f_data+tpl->fld[NF9_IPV6_SRC_ADDR].off[0]) != 0) {
+          UWE("( %s/core ): flow type PM_FTYPE_IPV6 (dual v4/v6), base prot",
+              config.name);
           ret += PM_FTYPE_IPV6;
           have_ip_proto = TRUE;
         }
         else if (*(pptrs->f_data+tpl->fld[NF9_IPV4_SRC_ADDR].off[0]) != 0) {
+          UWE("( %s/core ): flow type PM_FTYPE_IPV4 (dual v4/v6)", config.name);
           ret += PM_FTYPE_IPV4;
 	  have_ip_proto = TRUE;
 	}
 	else {
+          UWE("( %s/core ): flow type PM_FTYPE_IPV6 (dual v4/v6)", config.name);
 	  ret += PM_FTYPE_IPV6;
 	  have_ip_proto = TRUE;
 	}
@@ -3385,21 +3489,25 @@ void NF_evaluate_flow_type(struct flow_chars *flow_type, struct template_cache_e
       else if (tpl->fld[NF9_IPV4_SRC_ADDR].count || tpl->fld[NF9_IPV4_DST_ADDR].count ||
                tpl->fld[NF9_IPV4_SRC_PREFIX].count || tpl->fld[NF9_IPV4_DST_PREFIX].count ||
                tpl->fld[NF9_staIPv4Address].count) {
+        UWE("( %s/core ): flow type PM_FTYPE_IPV4 (addr/prefix)", config.name);
         ret += PM_FTYPE_IPV4;
 	have_ip_proto = TRUE;
       }
       else if (tpl->fld[NF9_IPV6_SRC_ADDR].count || tpl->fld[NF9_IPV6_DST_ADDR].count ||
                tpl->fld[NF9_IPV6_SRC_PREFIX].count || tpl->fld[NF9_IPV6_DST_PREFIX].count) {
+        UWE("( %s/core ): flow type PM_FTYPE_IPV6 (addr/prefix)", config.name);
 	ret += PM_FTYPE_IPV6;
 	have_ip_proto = TRUE;
       }
     }
 
     if (tpl->fld[NF9_DATALINK_FRAME_SECTION].count || tpl->fld[NF9_LAYER2_PKT_SECTION_DATA].count) {
+      UWE("( %s/core ): flow type NF9_FTYPE_DLFS", config.name);
       ret = NF9_FTYPE_DLFS;
     }
 
     if (tpl->fld[NF9_INITIATOR_OCTETS].count && tpl->fld[NF9_RESPONDER_OCTETS].count) {
+      UWE("( %s/core ): flow type binary", config.name);
       flow_type->is_bi = TRUE;
     }
   }
@@ -3413,10 +3521,15 @@ void NF_evaluate_flow_type(struct flow_chars *flow_type, struct template_cache_e
   if (tpl->template_type == 1) ret = NF9_FTYPE_OPTION;
 
   flow_type->traffic_type = ret;
+
+  UWE("( %s/core ): end, flow type %d %s",
+      config.name, ret, UWE_get_flow_type(ret));
 }
 
 u_int16_t NF_evaluate_direction(struct template_cache_entry *tpl, struct packet_ptrs *pptrs)
 {
+  UWE("( %s/core ): start", config.name);
+
   u_int16_t ret = DIRECTION_IN;
 
   if (tpl->fld[NF9_DIRECTION].count && *(pptrs->f_data+tpl->fld[NF9_DIRECTION].off[0]) == 1)
@@ -3465,6 +3578,8 @@ void reset_dummy_v4(struct packet_ptrs *pptrs, u_char *dummy_packet)
 
 int NF_find_id(struct id_table *t, struct packet_ptrs *pptrs, pm_id_t *tag, pm_id_t *tag2)
 {
+  UWE("( %s/core ): start", config.name);
+
   struct xflow_status_entry *entry = (struct xflow_status_entry *) pptrs->f_status;
   struct sockaddr *sa = NULL;
   u_char *saved_f_agent = NULL;
@@ -3537,6 +3652,8 @@ int NF_find_id(struct id_table *t, struct packet_ptrs *pptrs, pm_id_t *tag, pm_i
   exit_lane:
   if (entry && entry->exp_sa.sa_family) pptrs->f_agent = saved_f_agent; 
 
+  UWE("( %s/core ): end, id %lu", config.name, ret);
+
   return ret;
 }
 
@@ -3578,6 +3695,8 @@ struct xflow_status_entry *nfv9_check_status(struct packet_ptrs *pptrs, u_int32_
 
 void NF_process_classifiers(struct packet_ptrs *pptrs_main, struct packet_ptrs *pptrs, unsigned char *pkt, struct template_cache_entry *tpl)
 {
+  UWE("( %s/core ): start", config.name);
+
   if (tpl->fld[NF9_APPLICATION_ID].len[0] == 2 ||
       tpl->fld[NF9_APPLICATION_ID].len[0] == 3 ||
       tpl->fld[NF9_APPLICATION_ID].len[0] == 5) {
@@ -3614,6 +3733,8 @@ pm_class_t NF_evaluate_classifiers(struct xflow_status_entry_class *entry, pm_cl
 
 void nfv9_datalink_frame_section_handler(struct packet_ptrs *pptrs)
 {
+  UWE("( %s/core ): start", config.name);
+
   struct template_cache_entry *tpl = (struct template_cache_entry *) pptrs->f_tpl;
   struct utpl_field *utpl = NULL;
   u_int16_t frame_type = NF9_DL_F_TYPE_UNKNOWN, t16, idx;
@@ -3664,6 +3785,8 @@ void nfv9_datalink_frame_section_handler(struct packet_ptrs *pptrs)
 #ifdef WITH_KAFKA
 void NF_init_kafka_host(void *kh)
 {
+  UWE("( %s/core ): start", config.name);
+
   struct p_kafka_host *kafka_host = kh;
 
   p_kafka_init_host(kafka_host, config.nfacctd_kafka_config_file);
@@ -3678,6 +3801,8 @@ void NF_init_kafka_host(void *kh)
 #ifdef WITH_ZMQ
 void NF_init_zmq_host(void *zh, int *pipe_fd)
 {
+  UWE("( %s/core ): start", config.name);
+
   struct p_zmq_host *zmq_host = zh;
   char log_id[SHORTBUFLEN];
 
@@ -3704,6 +3829,8 @@ void NF_mpls_vpn_rd_from_map (struct packet_ptrs *pptrs)
 /* Get RD from IPFIX/NFv9 Data Packet for correlation with BGP/BMP */
 void NF_mpls_vpn_rd_from_ie90(struct packet_ptrs *pptrs)
 {
+  UWE("( %s/core ): start", config.name);
+
   struct struct_header_v5 *hdr = (struct struct_header_v5 *) pptrs->f_header;
   struct template_cache_entry *tpl = (struct template_cache_entry *) pptrs->f_tpl;
 
@@ -3715,8 +3842,18 @@ void NF_mpls_vpn_rd_from_ie90(struct packet_ptrs *pptrs)
 
         memcpy(&pptrs->bitr, pptrs->f_data+tpl->fld[NF9_MPLS_VPN_RD].off[0],
              MIN(tpl->fld[NF9_MPLS_VPN_RD].len[0], 8));
+        UWEX(&pptrs->bitr, 8);
+        UWE("( %s/core ): after memcpy, rd as type %u, as %u, val %u",
+            config.name, ((rd_t *)&pptrs->bitr)->type,
+            ((rd_t *)&pptrs->bitr)->as, ((rd_t *)&pptrs->bitr)->val);
         bgp_rd_ntoh((rd_t *)&pptrs->bitr);
+        UWE("( %s/core ): after bgp_rd_ntoh, rd as type %u, as %u, val %u",
+            config.name, ((rd_t *)&pptrs->bitr)->type,
+            ((rd_t *)&pptrs->bitr)->as, ((rd_t *)&pptrs->bitr)->val);
         bgp_rd_origin_set((rd_t *)&pptrs->bitr, RD_ORIGIN_FLOW);
+        UWE("( %s/core ): after bgp_rd_origin_set, rd as type %u, as %u, val %u",
+            config.name, ((rd_t *)&pptrs->bitr)->type,
+            ((rd_t *)&pptrs->bitr)->as, ((rd_t *)&pptrs->bitr)->val);
       }
     }
     break;
@@ -3728,6 +3865,8 @@ void NF_mpls_vpn_rd_from_ie90(struct packet_ptrs *pptrs)
 /* Get RD from IPFIX/NFv9 Option Data for correlation with BGP/BMP */
 void NF_mpls_vpn_rd_from_options(struct packet_ptrs *pptrs)
 {
+  UWE("( %s/core ): start", config.name);
+
   struct xflow_status_entry *entry = (struct xflow_status_entry *) pptrs->f_status;
   struct struct_header_v5 *hdr = (struct struct_header_v5 *) pptrs->f_header;
   struct template_cache_entry *tpl = (struct template_cache_entry *) pptrs->f_tpl;
@@ -3830,4 +3969,6 @@ void NF_mpls_vpn_rd_from_options(struct packet_ptrs *pptrs)
   default:
     break;
   }
+
+  UWE("( %s/core ): end", config.name);
 }
