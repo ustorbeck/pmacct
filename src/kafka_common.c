@@ -435,6 +435,8 @@ int p_kafka_connect_to_produce(struct p_kafka_host *kafka_host)
 
 int p_kafka_produce_data_to_part(struct p_kafka_host *kafka_host, void *data, size_t data_len, int part, int do_free)
 {
+  UWE("( %s/%s ): start", config.name, config.type);
+
   int ret = SUCCESS;
   int flag = RD_KAFKA_MSG_F_COPY;
 
@@ -461,6 +463,9 @@ int p_kafka_produce_data_to_part(struct p_kafka_host *kafka_host, void *data, si
   }
 
   rd_kafka_poll(kafka_host->rk, 0);
+
+  UWE("( %s/%s ): end, return %d", config.name, config.type, ret);
+
   return ret; 
 }
 
@@ -628,6 +633,8 @@ int p_kafka_check_outq_len(struct p_kafka_host *kafka_host)
 #if defined WITH_JANSSON
 int write_and_free_json_kafka(void *kafka_log, void *obj)
 {
+  UWE("( %s/%s ): start", config.name, config.type);
+
   char *orig_kafka_topic = NULL, dyn_kafka_topic[SRVBUFLEN];
   struct p_kafka_host *alog = (struct p_kafka_host *) kafka_log;
   int ret = ERR;
@@ -661,6 +668,8 @@ int write_and_free_json_kafka(void *kafka_log, void *obj)
 
 int write_binary_kafka(void *kafka_log, void *obj, size_t len)
 {
+  UWE("( %s/%s ): start", config.name, config.type);
+
   char *orig_kafka_topic = NULL, dyn_kafka_topic[SRVBUFLEN];
   struct p_kafka_host *alog = (struct p_kafka_host *) kafka_log;
   int ret = ERR;
