@@ -816,7 +816,7 @@ static struct template_cache_entry *nfacctd_offline_read_json_template(char *buf
 
 static layer_prot evaluate_layer_prot(u_int16_t type)
 {
-  UWE("( %s/core ): start, type %u", config.name, type);
+  //UWE("( %s/core ): start, type %u", config.name, type);
 
   layer_prot prot;
 
@@ -831,6 +831,7 @@ static layer_prot evaluate_layer_prot(u_int16_t type)
       prot = none;
   }
 
+#if 0
   static const char *layer_prot_names[] = {
     [none] = "none",
     [ipv4] = "ipv4",
@@ -839,6 +840,7 @@ static layer_prot evaluate_layer_prot(u_int16_t type)
 
   UWE("( %s/core ): end, prot %d (%s)",
       config.name, prot, layer_prot_names[prot]);
+#endif
 
   return prot;
 }
