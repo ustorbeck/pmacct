@@ -56,6 +56,8 @@ int (*find_id_func)(struct id_table *, struct packet_ptrs *, pm_id_t *, pm_id_t 
 */
 void load_id_file(int acct_type, char *filename, struct id_table *t, struct plugin_requests *req, int *map_allocated)
 {
+  UWE("( %s / %s ): start, file \"%s\"", config.name, config.type, filename);
+
   struct id_table tmp;
   struct id_entry *ptr;
   FILE *file;
@@ -842,6 +844,8 @@ char *pt_check_range(char *str)
 void load_pre_tag_map(int acct_type, char *filename, struct id_table *t, struct plugin_requests *req,
 		      int *map_allocated, int map_entries, int map_row_len)
 {
+  UWE("( %s / %s ): start, file \"%s\"", config.name, config.type, filename);
+
   if (req) {
     req->map_entries = map_entries;
     req->map_row_len = map_row_len;
@@ -915,6 +919,8 @@ int pretag_copy_label(pt_label_t *dst, pt_label_t *src)
 {
   if (!src || !dst) return ERR;
 
+  UWE("( %s/%s ): start, label \"%s\"", config.name, config.type, src->val);
+
   if (dst->val) {
     Log(LOG_WARNING, "WARN ( %s/%s ): pretag_copy_label failed: dst->val not null\n", config.name, config.type);
     return ERR;
@@ -931,6 +937,8 @@ int pretag_copy_label(pt_label_t *dst, pt_label_t *src)
       dst->val[dst->len - 1] = '\0';
     }
   }
+
+  UWE("( %s/%s ): end, label \"%s\"", config.name, config.type, dst->val);
   
   return SUCCESS;
 }
@@ -1382,6 +1390,9 @@ void pretag_index_destroy(struct id_table *t)
 
 u_int32_t pretag_index_lookup(struct id_table *t, struct packet_ptrs *pptrs, struct id_entry **index_results, int ir_entries)
 {
+  UWE("( %s / %s ): start, table \"%s\"",
+      config.name, config.type, t->filename);
+
   struct id_entry res_fdata;
   pm_hash_serial_t *hash_serializer;
   pm_hash_key_t *hash_key;
