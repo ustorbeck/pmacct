@@ -2072,6 +2072,8 @@ int check_allow(struct hosts_table *allow, struct sockaddr *sa)
 
 int BTA_find_id(struct id_table *t, struct packet_ptrs *pptrs, pm_id_t *tag, pm_id_t *tag2)
 {
+  UWE("( %s/%s ): start", config.name, config.type);
+
   struct xflow_status_entry *xsentry = (struct xflow_status_entry *) pptrs->f_status;
   struct xflow_status_map_cache *xsmc = NULL;
   int ret = 0;
@@ -3420,6 +3422,9 @@ void pm_pcap_device_initialize(struct pm_pcap_devices *map)
 
 void open_pcap_savefile(struct pm_pcap_device *dev_ptr, char *file)
 {
+  UWE("( %s/%s ): start, device \"%s\", file \"%s\"",
+      config.name, config.type, dev_ptr->str, file);
+
   char errbuf[PCAP_ERRBUF_SIZE];
   int idx;
 
