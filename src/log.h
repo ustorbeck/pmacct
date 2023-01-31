@@ -29,6 +29,7 @@
 #define UWE(format, ...) \
   Log(LOG_DEBUG, "UWE %s:%d %s " format "\n", \
       __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define UWEX(buf, len) Logx(LOG_DEBUG, buf, len)
 
 /* defines */
 #define LOGSTRLEN LONGSRVBUFLEN 
@@ -83,6 +84,7 @@ extern void Log(short int, char *, ...)
   __attribute__((format(printf, 2, 3)))
 #endif
   ;
+extern void Logx(short int, void *, int);
 extern int parse_log_facility(const char *);
 extern void log_notification_init(struct log_notification *);
 extern void log_notifications_init(struct _log_notifications *);

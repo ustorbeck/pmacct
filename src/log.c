@@ -69,6 +69,37 @@ void Log(short int level, char *msg, ...)
   }
 }
 
+void Logx(short int level, void *buf, int len)
+{
+  unsigned char *s = buf;
+  char o[72];
+
+  for (unsigned short int l = 0; l < len; l += 16) {
+
+    char *d = o;
+
+    d += sprintf(d, "%04x ", l);
+
+    for (unsigned short int c = l; c < l+16; c++)
+      if (c < len)
+        d += sprintf(d, " %02x", s[c]);
+      else
+        d += sprintf(d, "   ");
+
+    d += sprintf(d, "  ");
+
+    for (int c = l; c < l+16; c++)
+      if (c >= len)
+        break;
+      else if (isprint(s[c]))
+        d += sprintf(d, "%c", s[c]);
+      else
+        d += sprintf(d, ".");
+
+    Log(level, "%s\n", o);
+  }
+}
+
 int parse_log_facility(const char *facility)
 {
   int i;
