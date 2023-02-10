@@ -26,6 +26,19 @@
 /* Global variables */
 struct _log_notifications log_notifications;
 
+static void debug_off(int signum)
+{
+  Log(LOG_INFO, "INFO ( %s/%s ): switching debug off\n",
+      config.name, config.type);
+  config.debug = FALSE;
+}
+
+static void debug_on(int signum)
+{
+  Log(LOG_INFO, "INFO ( %s/%s ): switching debug on\n",
+      config.name, config.type);
+  config.debug = TRUE;
+}
 
 /* functions */
 void Log(short int level, char *msg, ...)
@@ -126,6 +139,12 @@ void log_notifications_init(struct _log_notifications *ln)
   if (ln) {
     memset(ln, 0, sizeof(struct _log_notifications));
   }
+
+  sighandler_action.sa_handler = debug_off;
+  sigaction(SIGRTMIN + 6 /* 40 */, &sighandler_action, NULL);
+
+  sighandler_action.sa_handler = debug_on;
+  sigaction(SIGRTMIN + 7 /* 41 */, &sighandler_action, NULL);
 }
 
 int log_notification_set(struct log_notification *ln, time_t now, int timeout)
