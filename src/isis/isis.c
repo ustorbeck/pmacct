@@ -346,6 +346,8 @@ int iso_handler(register struct packet_ptrs *pptrs)
 
 void isis_srcdst_lookup(struct packet_ptrs *pptrs)
 {
+  UWE("( %s/core/ISIS ): start", config.name);
+
   struct route_node *result;
   struct isis_area *area;
   char area_tag[] = "default";
