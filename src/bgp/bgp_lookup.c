@@ -30,6 +30,8 @@
 
 void bgp_srcdst_lookup(struct packet_ptrs *pptrs, int type)
 {
+  UWE("( %s/%s ): start", config.name, config.type);
+
   struct bgp_misc_structs *bms;
   struct bgp_rt_structs *inter_domain_routing_db;
   struct sockaddr *sa = (struct sockaddr *) pptrs->f_agent, sa_local;
