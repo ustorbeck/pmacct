@@ -6731,6 +6731,8 @@ void cfg_set_primitive_index_value(u_int64_t index, u_int64_t value, u_int64_t *
 
 void cfg_set_aggregate(char *filename, u_int64_t registry[], u_int64_t input, char *token)
 {
+  UWE("[%s] start (%0lx %s)", filename, input, token);
+
   u_int64_t index, value;
 
   cfg_get_primitive_index_value(input, &index, &value); 
