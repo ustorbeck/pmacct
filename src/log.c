@@ -51,16 +51,18 @@ void Log(short int level, char *msg, ...)
       char timebuf[SRVBUFLEN];
       struct tm *tmnow;
       time_t now;
+      struct timespec ts;
 
-      now = time(NULL);
+      clock_gettime(CLOCK_REALTIME, &ts);
+      now = ts.tv_sec;
       if (!config.timestamps_utc) tmnow = localtime(&now);
       else tmnow = gmtime(&now);
 
       strftime(timebuf, SRVBUFLEN, "%Y-%m-%dT%H:%M:%S", tmnow);
-      append_rfc3339_timezone(timebuf, SRVBUFLEN, tmnow);
+      //append_rfc3339_timezone(timebuf, SRVBUFLEN, tmnow);
 
-      fprintf(config.logfile_fd, "%s %d/%ld ",
-              timebuf, getpid(), syscall(SYS_gettid));
+      fprintf(config.logfile_fd, "%s.%06ld %d/%ld ",
+              timebuf, ts.tv_nsec/1000, getpid(), syscall(SYS_gettid));
       va_start(ap, msg);
       vfprintf(config.logfile_fd, msg, ap);
       va_end(ap);
