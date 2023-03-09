@@ -1533,11 +1533,13 @@ struct utpl_field *ext_db_get_ie(struct template_cache_entry *ptr, u_int32_t pen
   struct utpl_field *ext_db_ptr = NULL;
 
   for (ie_idx = 0; ie_idx < IES_PER_TPL_EXT_DB_ENTRY; ie_idx++) {
+#if 0
     UWE("( %s/core ): compare with db entry %u (pen %u, type %u, repeat %u)",
         config.name, ie_idx,
         ptr->ext_db[ext_db_modulo].ie[ie_idx].pen,
         ptr->ext_db[ext_db_modulo].ie[ie_idx].type,
         ptr->ext_db[ext_db_modulo].ie[ie_idx].repeat_id);
+#endif
     if (ptr->ext_db[ext_db_modulo].ie[ie_idx].type == type &&
         ptr->ext_db[ext_db_modulo].ie[ie_idx].pen == pen &&
         ptr->ext_db[ext_db_modulo].ie[ie_idx].repeat_id == repeat_id) {
