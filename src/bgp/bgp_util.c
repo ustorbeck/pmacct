@@ -691,6 +691,9 @@ int bgp_peer_init(struct bgp_peer *peer, int type, int buflen)
 
   if (!peer || !bms) return ERR;
 
+  UWE("( %s/%s ): start, peer %s, type %d",
+      config.name, bms->log_str, peer->addr_str, type);
+
   memset(peer, 0, sizeof(struct bgp_peer));
   peer->type = type;
   peer->status = Idle;
@@ -730,6 +733,8 @@ void bgp_peer_close(struct bgp_peer *peer, int type, int no_quiet, int send_noti
   bms = bgp_select_misc_db(peer->type);
 
   if (!bms) return;
+
+  UWE("( %s/%s ): start", config.name, bms->log_str);
 
   if (!config.bgp_xconnect_map) {
     if (send_notification) {
@@ -795,6 +800,8 @@ int bgp_peer_xconnect_init(struct bgp_peer *peer, int type)
   bms = bgp_select_misc_db(type);
 
   if (!peer || !bms) return ERR;
+
+  UWE("( %s/%s ): start", config.name, bms->log_str);
 
   bxm = bms->xconnects;
 
