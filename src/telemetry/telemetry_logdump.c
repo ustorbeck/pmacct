@@ -42,6 +42,10 @@ int telemetry_log_msg(telemetry_peer *peer, struct telemetry_data *t_data, telem
 
   if (!peer || !peer->log || !log_data || !log_data_len || !t_data || !event_type) return ERR;
 
+  UWE("( %s/%s ): start, peer %s, data len %u, sequence %lu, event type %s, decoder %d, output %d",
+      config.name, t_data->log_str, peer->addr_str, log_data_len, log_seq,
+      event_type, data_decoder, output);
+
   tms = bgp_select_misc_db(FUNC_TYPE_TELEMETRY);
 
   if (!tms) return ERR;
@@ -151,6 +155,8 @@ int telemetry_log_msg(telemetry_peer *peer, struct telemetry_data *t_data, telem
 
 void telemetry_dump_se_ll_append(telemetry_peer *peer, struct telemetry_data *t_data, int data_decoder)
 {
+  UWE("( %s/%s ): start", config.name, t_data->log_str);
+
   telemetry_misc_structs *tms;
   telemetry_dump_se_ll *se_ll;
   telemetry_dump_se_ll_elem *se_ll_elem;
@@ -201,56 +207,78 @@ void telemetry_dump_se_ll_append(telemetry_peer *peer, struct telemetry_data *t_
 
 void telemetry_log_seq_init(u_int64_t *seq)
 {
+  UWE("( %s ): start", config.name);
+
   bgp_peer_log_seq_init(seq);
 }
 
 void telemetry_log_seq_increment(u_int64_t *seq)
 {
+  UWE("( %s ): start", config.name);
+
   bgp_peer_log_seq_increment(seq);
 }
 
 u_int64_t telemetry_log_seq_get(u_int64_t *seq)
 {
+  UWE("( %s ): start", config.name);
+
   return bgp_peer_log_seq_get(seq);
 }
 
 void telemetry_log_seq_set(u_int64_t *seq, u_int64_t value)
 {
+  UWE("( %s ): start", config.name);
+
   bgp_peer_log_seq_set(seq, value);
 }
 
 int telemetry_log_seq_has_ro_bit(u_int64_t *seq)
 {
+  UWE("( %s ): start", config.name);
+
   return bgp_peer_log_seq_has_ro_bit(seq);
 }
 
 int telemetry_peer_log_init(telemetry_peer *peer, telemetry_tag_t *tag, int output, int type)
 {
+  UWE("( %s ): start", config.name);
+
   return bgp_peer_log_init(peer, tag, output, type);
 }
 
 void telemetry_peer_log_dynname(char *new, int newlen, char *old, telemetry_peer *peer)
 {
+  UWE("( %s ): start", config.name);
+
   bgp_peer_log_dynname(new, newlen, old, peer);
 }
 
 int telemetry_peer_dump_init(telemetry_peer *peer, telemetry_tag_t *tag, int output, int type)
 {
+  UWE("( %s ): start", config.name);
+
   return bgp_peer_dump_init(peer, tag, output, type);
 }
 
 int telemetry_peer_dump_close(telemetry_peer *peer, telemetry_tag_t *tag, int output, int type)
 {
+  UWE("( %s ): start", config.name);
+
   return bgp_peer_dump_close(peer, tag, NULL, output, type);
 }
 
 void telemetry_dump_init_peer(telemetry_peer *peer)
 {
+  UWE("( %s ): start", config.name);
+
   bmp_dump_init_peer(peer);
 }
 
 void telemetry_dump_se_ll_destroy(telemetry_dump_se_ll *tdsell)
 {
+  UWE("( %s ): start", config.name);
+
   telemetry_dump_se_ll_elem *se_ll_elem, *se_ll_elem_next;
 
   if (!tdsell) return;
@@ -270,6 +298,8 @@ void telemetry_dump_se_ll_destroy(telemetry_dump_se_ll *tdsell)
 
 void telemetry_handle_dump_event(struct telemetry_data *t_data, int max_peers_idx)
 {
+  UWE("( %s/%s ): start", config.name, t_data->log_str);
+
   telemetry_misc_structs *tms = bgp_select_misc_db(FUNC_TYPE_TELEMETRY);
   thread_pool_t *telemetry_dump_workers_pool;
   struct pm_dump_runner pdr[config.telemetry_dump_workers];
@@ -361,6 +391,8 @@ int telemetry_dump_event_runner(struct pm_dump_runner *pdr)
   assert(pdr);
   assert(pdr->extra);
   t_data = pdr->extra;
+
+  UWE("( %s/%s ): start", config.name, t_data->log_str);
 
 #ifdef WITH_RABBITMQ
   struct p_amqp_host telemetry_dump_amqp_host;
@@ -533,6 +565,8 @@ int telemetry_dump_event_runner(struct pm_dump_runner *pdr)
 #if defined WITH_RABBITMQ
 void telemetry_daemon_msglog_init_amqp_host()
 {
+  UWE("( %s ): start", config.name);
+
   p_amqp_init_host(&telemetry_daemon_msglog_amqp_host);
 
   if (!config.telemetry_msglog_amqp_user) config.telemetry_msglog_amqp_user = rabbitmq_user;
@@ -564,6 +598,8 @@ void telemetry_daemon_msglog_init_amqp_host()
 #if defined WITH_RABBITMQ
 void telemetry_dump_init_amqp_host(void *tdah)
 {
+  UWE("( %s ): start", config.name);
+
   struct p_amqp_host *telemetry_dump_amqp_host = tdah;
 
   p_amqp_init_host(telemetry_dump_amqp_host);
@@ -595,6 +631,8 @@ void telemetry_dump_init_amqp_host(void *tdkh)
 #if defined WITH_KAFKA
 int telemetry_daemon_msglog_init_kafka_host()
 {
+  UWE("( %s ): start", config.name);
+
   int ret;
 
   p_kafka_init_host(&telemetry_daemon_msglog_kafka_host, config.telemetry_msglog_kafka_config_file);
@@ -623,6 +661,8 @@ int telemetry_daemon_msglog_init_kafka_host()
 #if defined WITH_KAFKA
 int telemetry_dump_init_kafka_host(void *tdkh)
 {
+  UWE("( %s ): start", config.name);
+
   struct p_kafka_host *telemetry_dump_kafka_host = tdkh;
   int ret;
 
@@ -650,6 +690,9 @@ int telemetry_dump_init_kafka_host(void *tdkh)
 #ifdef WITH_JANSSON
 void telemetry_tag_print_json(json_t *obj, telemetry_tag_t *tag)
 {
+  UWE("( %s ): start, json obj %u, size %lu",
+      config.name, obj->type, obj->refcount);
+
   bgp_tag_print_json(obj, tag);
 }
 #endif
