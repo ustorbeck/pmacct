@@ -33,11 +33,15 @@
 /* Functions */
 int telemetry_peer_init(telemetry_peer *peer, int type)
 {
+  UWE("( %s ): start", config.name);
+
   return bgp_peer_init(peer, type, TELEMETRY_BUFFER_SIZE);
 }
 
 void telemetry_peer_close(telemetry_peer *peer, int type)
 {
+  UWE("( %s ): start", config.name);
+
   telemetry_dump_se_ll *tdsell;
   telemetry_misc_structs *tms;
 
@@ -70,6 +74,8 @@ void telemetry_peer_close(telemetry_peer *peer, int type)
 
 u_int32_t telemetry_cisco_hdr_v0_get_len(telemetry_peer *peer)
 {
+  UWE("( %s ): start", config.name);
+
   u_int32_t len;
 
   memcpy(&len, (peer->buf.base + 8), 4);
@@ -80,6 +86,8 @@ u_int32_t telemetry_cisco_hdr_v0_get_len(telemetry_peer *peer)
 
 u_int32_t telemetry_cisco_hdr_v0_get_type(telemetry_peer *peer)
 {
+  UWE("( %s ): start", config.name);
+
   u_int32_t type;
 
   memcpy(&type, peer->buf.base, 4);
@@ -90,6 +98,8 @@ u_int32_t telemetry_cisco_hdr_v0_get_type(telemetry_peer *peer)
 
 u_int32_t telemetry_cisco_hdr_v1_get_len(telemetry_peer *peer)
 {
+  UWE("( %s ): start", config.name);
+
   u_int32_t len;
 
   memcpy(&len, (peer->buf.base + 8), 4);
@@ -100,6 +110,8 @@ u_int32_t telemetry_cisco_hdr_v1_get_len(telemetry_peer *peer)
 
 u_int16_t telemetry_cisco_hdr_v1_get_type(telemetry_peer *peer)
 {
+  UWE("( %s ): start", config.name);
+
   u_int16_t type;
 
   memcpy(&type, peer->buf.base, 2);
@@ -110,6 +122,8 @@ u_int16_t telemetry_cisco_hdr_v1_get_type(telemetry_peer *peer)
 
 u_int16_t telemetry_cisco_hdr_v1_get_encap(telemetry_peer *peer)
 {
+  UWE("( %s ): start", config.name);
+
   u_int16_t encap;
 
   memcpy(&encap, (peer->buf.base + 2), 2);
@@ -120,11 +134,15 @@ u_int16_t telemetry_cisco_hdr_v1_get_encap(telemetry_peer *peer)
 
 int telemetry_tpc_addr_cmp(const void *a, const void *b)
 {
+  UWE("( %s ): start", config.name);
+
   return host_addr_cmp(&((telemetry_peer_cache *)a)->addr, &((telemetry_peer_cache *)b)->addr);
 }
 
 void telemetry_link_misc_structs(telemetry_misc_structs *tms)
 {
+  UWE("( %s ): start", config.name);
+
 #if defined WITH_RABBITMQ
   tms->msglog_amqp_host = &telemetry_daemon_msglog_amqp_host;
 #endif
@@ -160,6 +178,8 @@ void telemetry_link_misc_structs(telemetry_misc_structs *tms)
 
 int telemetry_validate_input_output_decoders(int input, int output)
 {
+  UWE("( %s ): start", config.name);
+
   if (input == TELEMETRY_DATA_DECODER_GPB) {
     if (output == PRINT_OUTPUT_JSON) return FALSE;
     /* else if (output == PRINT_OUTPUT_GPB) return FALSE; */
@@ -212,6 +232,8 @@ void telemetry_log_global_stats(struct telemetry_data *t_data)
 #ifdef WITH_UNYTE_UDP_NOTIF
 int create_socket_unyte_udp_notif(struct telemetry_data *t_data, char *address, char *port)
 {
+  UWE("( %s/%s ): start", config.name, t_data->log_str);
+
   uint64_t receive_buf_size;
   struct addrinfo *addr_info;
   struct addrinfo hints;
@@ -288,6 +310,8 @@ int create_socket_unyte_udp_notif(struct telemetry_data *t_data, char *address, 
 
   /* free addr_info after usage */
   freeaddrinfo(addr_info);
+
+  UWE("( %s/%s ): end, socket fd %d", config.name, t_data->log_str, sockfd);
 
   return sockfd;
 }
