@@ -50,6 +50,8 @@ struct sockaddr_storage telemetry_logdump_tag_peer;
 /* Functions */
 void telemetry_wrapper()
 {
+  UWE("( %s/core/TELE ): start", config.name);
+
   struct telemetry_data *t_data;
 
   /* initialize threads pool */
@@ -72,6 +74,8 @@ int telemetry_daemon(void *t_data_void)
 {
   struct telemetry_data *t_data = t_data_void;
   telemetry_peer_cache tpc;
+
+  UWE("( %s/%s ): start", config.name, t_data->log_str);
 
   int ret, rc, peers_idx, allowed, yes=1;
   int peers_idx_rr = 0, max_peers_idx = 0, peers_num = 0;
@@ -292,6 +296,9 @@ int telemetry_daemon(void *t_data_void)
     }
   }
 
+  UWE("( %s/%s ): dump backend methods %u", config.name, t_data->log_str,
+      telemetry_misc_db->dump_backend_methods);
+
   if (config.telemetry_dump_file || config.telemetry_dump_amqp_routing_key || config.telemetry_dump_kafka_topic) {
     if (config.telemetry_dump_file) telemetry_misc_db->dump_backend_methods++;
     if (config.telemetry_dump_amqp_routing_key) telemetry_misc_db->dump_backend_methods++;
@@ -445,6 +452,8 @@ int telemetry_daemon(void *t_data_void)
   }
 #if defined WITH_UNYTE_UDP_NOTIF
   else if (unyte_udp_notif_input) {
+    UWE("( %s/%s ): start of udp notif section", config.name, t_data->log_str);
+
     unyte_udp_options_t options = {0};
     int sockfd;
 
@@ -481,6 +490,7 @@ int telemetry_daemon(void *t_data_void)
       options.legacy = TRUE;
     }
 
+    UWE("( %s/%s ): starting udp notif collector", config.name, t_data->log_str);
     uun_collector = unyte_udp_start_collector(&options);
 
     Log(LOG_INFO, "INFO ( %s/%s ): reading telemetry data from Unyte UDP Notif on %s:%s\n", config.name, t_data->log_str, config.telemetry_udp_notif_ip, udp_notif_port);
@@ -516,6 +526,10 @@ int telemetry_daemon(void *t_data_void)
     Log(LOG_WARNING, "WARN ( %s/%s ): telemetry_table_dump_output set to json but will produce no output (missing --enable-jansson).\n", config.name, t_data->log_str);
 #endif
   }
+
+  UWE("( %s/%s ): dump backend methods %u, telemetry dump time slots %u",
+      config.name, t_data->log_str, telemetry_misc_db->dump_backend_methods,
+      config.telemetry_dump_time_slots);
 
   if (telemetry_misc_db->dump_backend_methods) {
     char dump_roundoff[] = "m";
@@ -593,6 +607,8 @@ int telemetry_daemon(void *t_data_void)
 
   for (;;) {
     select_again:
+
+    UWE("( %s/%s ): start of main loop", config.name, t_data->log_str);
 
     if (!t_data->is_thread) {
       sigprocmask(SIG_UNBLOCK, &signal_set, NULL);
@@ -792,8 +808,15 @@ int telemetry_daemon(void *t_data_void)
 
           seg = (unyte_seg_met_t *)seg_ptr;
 
+          UWE("( %s/%s ): got udp notif input, mediatype %u, msg id %u, msg len %u, payload len %u (%lu)",
+              config.name, t_data->log_str, unyte_udp_get_media_type(seg),
+              unyte_udp_get_message_id(seg), unyte_udp_get_message_length(seg),
+              unyte_udp_get_payload_length(seg), strlen(seg->payload));
+
           if (unyte_udp_get_media_type(seg) == UNYTE_MEDIATYPE_YANG_JSON && config.telemetry_decoder_id == TELEMETRY_DECODER_JSON) {
             struct sockaddr_storage *unsa = NULL;
+
+            UWE("( %s/%s ): msg %s", config.name, t_data->log_str, seg->payload);
 
             unsa = unyte_udp_get_src(seg);
             memcpy(&client, unsa, sizeof(struct sockaddr_storage));
@@ -1020,12 +1043,15 @@ int telemetry_daemon(void *t_data_void)
       }
     }
   }
+  UWE("( %s/%s ): end", config.name, t_data->log_str);
 
   return SUCCESS;
 }
 
 void telemetry_prepare_thread(struct telemetry_data *t_data)
 {
+  UWE("( %s/%s ): start", config.name, t_data->log_str);
+
   if (!t_data) return;
 
   memset(t_data, 0, sizeof(struct telemetry_data));
@@ -1036,6 +1062,8 @@ void telemetry_prepare_thread(struct telemetry_data *t_data)
 
 void telemetry_prepare_daemon(struct telemetry_data *t_data)
 {
+  UWE("( %s/core ): start", config.name);
+
   if (!t_data) return;
 
   memset(t_data, 0, sizeof(struct telemetry_data));
