@@ -37,6 +37,9 @@ void telemetry_process_data(telemetry_peer *peer, struct telemetry_data *t_data,
 
   if (!peer || !t_data) return;
 
+  UWE("( %s/%s ): start, peer %s, decoder %d",
+      config.name, t_data->log_str, peer->addr_str, data_decoder);
+
   tms = bgp_select_misc_db(peer->type);
 
   if (!tms) return;
@@ -63,6 +66,8 @@ void telemetry_process_data(telemetry_peer *peer, struct telemetry_data *t_data,
 
 int telemetry_recv_generic(telemetry_peer *peer, u_int32_t len)
 {
+  UWE("( %s ): start", config.name);
+
   int ret = 0;
 
   if (!len) {
@@ -97,6 +102,8 @@ void telemetry_basic_process_json(telemetry_peer *peer)
 
 int telemetry_recv_json(telemetry_peer *peer, u_int32_t len, int *flags)
 {
+  UWE("( %s ): start", config.name);
+
   int ret = 0;
   if (!flags) return ret;
 
@@ -110,11 +117,15 @@ int telemetry_recv_json(telemetry_peer *peer, u_int32_t len, int *flags)
 
   if (ret) (*flags) = telemetry_basic_validate_json(peer);
 
+  UWE("( %s ): end, return %d", config.name, ret);
+
   return ret;
 }
 
 int telemetry_recv_gpb(telemetry_peer *peer, u_int32_t len)
 {
+  UWE("( %s ): start", config.name);
+
   int ret = 0;
 
   ret = telemetry_recv_generic(peer, len);
@@ -250,6 +261,8 @@ int telemetry_decode_producer_peer(struct telemetry_data *t_data, void *h, u_cha
   struct host_addr telemetry_node;
   u_int16_t telemetry_node_port = 0;
   int bytes = 0, ret = SUCCESS;
+
+  UWE("( %s/%s ): start", config.name, t_data->log_str);
 
   if (!buf || !buflen || !addr || !addr_len) return ERR;
 
