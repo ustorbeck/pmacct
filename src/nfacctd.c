@@ -3116,6 +3116,8 @@ void process_v9_packet(unsigned char *pkt, u_int16_t len, struct packet_ptrs_vec
 	  reset_dummy_v4(pptrs, dummy_packet_ptr);
 	  break;
 	default:
+          Log(LOG_DEBUG, "DEBUG ( %s/core ): unsupported traffic type %u\n",
+              config.name, pptrs->flow_type.traffic_type);
 	  break;
         }
 
