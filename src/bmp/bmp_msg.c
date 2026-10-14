@@ -456,6 +456,38 @@ void bmp_process_msg_peer_up(char **bmp_packet, u_int32_t *len, struct bmp_peer 
   }
 
   if (!ret) Log(LOG_WARNING, "WARN ( %s/%s ): [%s] [peer up] tsearch() unable to insert.\n", config.name, bms->log_str, peer->addr_str);
+  else {
+    struct bgp_peer *stored = *(struct bgp_peer **)ret;
+
+    /* Multiple BMP Peer-Up messages can be received for the very same peer
+     * identity (addr + peer_distinguisher) -- e.g. a router may split a
+     * Loc-RIB Peer-Up announcement into several messages, one per AFI/SAFI
+     * group, each carrying its own (fabricated) BGP OPEN capabilities.
+     * pm_tsearch() only stores the *first* peer seen for a given key and
+     * silently discards the data of any subsequent duplicate; without the
+     * merge below, ADD-PATH capabilities negotiated in a later Peer-Up
+     * (e.g. AFI_IP6/SAFI_MPLS_VPN) would be lost, causing bgp_nlri_parse()
+     * to misinterpret ADD-PATH-encoded NLRIs from that peer as plain ones. */
+    if (stored != bmpp_bgp_peer) {
+      afi_t afi;
+      safi_t safi;
+
+      for (afi = 0; afi <= bmpp_bgp_peer->cap_add_paths.afi_max; afi++) {
+        for (safi = 0; safi <= bmpp_bgp_peer->cap_add_paths.safi_max; safi++) {
+	  if (bmpp_bgp_peer->cap_add_paths.cap[afi][safi] && !stored->cap_add_paths.cap[afi][safi]) {
+	    stored->cap_add_paths.cap[afi][safi] = bmpp_bgp_peer->cap_add_paths.cap[afi][safi];
+	  }
+        }
+      }
+
+      if (bmpp_bgp_peer->cap_add_paths.afi_max > stored->cap_add_paths.afi_max) {
+        stored->cap_add_paths.afi_max = bmpp_bgp_peer->cap_add_paths.afi_max;
+      }
+      if (bmpp_bgp_peer->cap_add_paths.safi_max > stored->cap_add_paths.safi_max) {
+        stored->cap_add_paths.safi_max = bmpp_bgp_peer->cap_add_paths.safi_max;
+      }
+    }
+  }
 
   while ((*len)) {
     u_int32_t pen = 0;
